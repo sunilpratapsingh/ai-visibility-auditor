@@ -11,13 +11,16 @@
     <!-- Header -->
     <header class="header">
       <div class="header-left">
-        <svg class="logo" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="logo" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/>
           <path d="M12 6v6l4 2"/>
         </svg>
         <span class="header-title">AI Visibility Auditor</span>
+        <span class="version">v2.1</span>
       </div>
-      <span class="version">v2.0</span>
+      <div class="header-right">
+        <button class="btn-icon" id="btn-rescan" title="Re-scan page">&#8635;</button>
+      </div>
     </header>
 
     <!-- Loading State -->
@@ -34,14 +37,10 @@
 
     <!-- Results -->
     <div id="results" class="hidden">
-      <!-- URL Bar -->
-      <div class="url-bar">
-        <span id="page-url" class="url-text"></span>
-      </div>
 
-      <!-- Overall Score -->
-      <div class="score-card" id="score-card">
-        <div class="score-ring" id="score-ring">
+      <!-- Score Bar (compact, always visible) -->
+      <div class="score-bar" id="score-bar">
+        <div class="score-ring-sm" id="score-ring">
           <svg viewBox="0 0 100 100">
             <circle class="score-bg" cx="50" cy="50" r="42"/>
             <circle class="score-fill" id="score-fill" cx="50" cy="50" r="42"
@@ -49,132 +48,218 @@
           </svg>
           <div class="score-number" id="score-number">0</div>
         </div>
-        <div class="score-info">
+        <div class="score-meta">
           <div class="score-label" id="score-label">Analyzing...</div>
-          <div class="score-detail" id="score-detail"></div>
-          <div class="action-buttons">
-            <button class="btn-action" id="btn-copy" title="Copy report as markdown">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-              Copy
-            </button>
-            <button class="btn-action" id="btn-export" title="Export as JSON">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              JSON
-            </button>
-            <button class="btn-action btn-primary" id="btn-fullreport" title="Open full report in new tab">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-              Full Report
-            </button>
-          </div>
+          <div class="score-url" id="page-url"></div>
+        </div>
+        <div class="score-actions">
+          <button class="btn-sm" id="btn-copy" title="Copy markdown">&#128203;</button>
+          <button class="btn-sm" id="btn-export" title="Export JSON">&#11015;</button>
+          <button class="btn-sm btn-primary-sm" id="btn-fullreport" title="Full report">&#128196;</button>
         </div>
       </div>
 
-      <!-- Top Fixes -->
-      <div class="section fixes-section" id="section-fixes">
-        <button class="section-header open" data-section="fixes">
-          <span class="section-icon" style="color:#f59e0b">&#9733;</span>
-          <span class="section-title">Top Fixes (by impact)</span>
-          <span class="chevron">&#9660;</span>
-        </button>
-        <div class="section-body" id="body-fixes"></div>
+      <!-- Tab Navigation -->
+      <nav class="tab-bar">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="access">Access</button>
+        <button class="tab" data-tab="content">Content</button>
+        <button class="tab" data-tab="trust">Trust</button>
+        <button class="tab" data-tab="technical">Technical</button>
+        <button class="tab" data-tab="fixes">Fixes</button>
+      </nav>
+
+      <!-- Tab: Overview -->
+      <div class="tab-content active" id="tab-overview">
+        <!-- Category Score Grid -->
+        <div class="score-grid" id="score-grid">
+          <!-- Populated by JS: 12 mini score cards -->
+        </div>
+
+        <!-- Page Info -->
+        <div class="page-info" id="page-info">
+          <!-- Populated by JS: page type, word count, date, author -->
+        </div>
       </div>
 
-      <!-- Category Sections -->
-      <div class="sections">
+      <!-- Tab: Access (Can AI find you?) -->
+      <div class="tab-content" id="tab-access">
+        <div class="tab-label">Can AI find you?</div>
+
         <div class="section" id="section-robots">
-          <button class="section-header" data-section="robots">
+          <button class="section-header open" data-section="robots">
             <span class="section-icon" id="icon-robots">&#9679;</span>
-            <span class="section-title">Robots & Crawler Access</span>
+            <span class="section-title">AI Crawlers <span class="badge" id="badge-robots"></span></span>
             <span class="section-score" id="score-robots">--</span>
             <span class="chevron">&#9660;</span>
           </button>
-          <div class="section-body hidden" id="body-robots"></div>
+          <div class="section-body" id="body-robots"></div>
         </div>
 
         <div class="section" id="section-llms">
           <button class="section-header" data-section="llms">
             <span class="section-icon" id="icon-llms">&#9679;</span>
-            <span class="section-title">LLMs.txt</span>
+            <span class="section-title">LLMs.txt <span class="badge" id="badge-llms"></span></span>
             <span class="section-score" id="score-llms">--</span>
             <span class="chevron">&#9660;</span>
           </button>
           <div class="section-body hidden" id="body-llms"></div>
         </div>
 
+        <div class="section" id="section-sitemap">
+          <button class="section-header" data-section="sitemap">
+            <span class="section-icon" id="icon-sitemap">&#9679;</span>
+            <span class="section-title">Sitemap <span class="badge" id="badge-sitemap"></span></span>
+            <span class="section-score" id="score-sitemap">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-sitemap"></div>
+        </div>
+
         <div class="section" id="section-schema">
           <button class="section-header" data-section="schema">
             <span class="section-icon" id="icon-schema">&#9679;</span>
-            <span class="section-title">Schema & Structured Data</span>
+            <span class="section-title">Schema <span class="badge" id="badge-schema"></span></span>
             <span class="section-score" id="score-schema">--</span>
             <span class="chevron">&#9660;</span>
           </button>
           <div class="section-body hidden" id="body-schema"></div>
         </div>
+      </div>
+
+      <!-- Tab: Content (Will AI quote you?) -->
+      <div class="tab-content" id="tab-content">
+        <div class="tab-label">Will AI quote you?</div>
 
         <div class="section" id="section-content">
-          <button class="section-header" data-section="content">
+          <button class="section-header open" data-section="content">
             <span class="section-icon" id="icon-content">&#9679;</span>
-            <span class="section-title">Content Structure</span>
+            <span class="section-title">Structure <span class="badge" id="badge-content"></span></span>
             <span class="section-score" id="score-content">--</span>
             <span class="chevron">&#9660;</span>
           </button>
-          <div class="section-body hidden" id="body-content"></div>
+          <div class="section-body" id="body-content"></div>
         </div>
 
-        <div class="section" id="section-entity">
-          <button class="section-header" data-section="entity">
-            <span class="section-icon" id="icon-entity">&#9679;</span>
-            <span class="section-title">Entity & Authority</span>
-            <span class="section-score" id="score-entity">--</span>
+        <div class="section" id="section-readability">
+          <button class="section-header" data-section="readability">
+            <span class="section-icon" id="icon-readability">&#9679;</span>
+            <span class="section-title">Readability <span class="badge" id="badge-readability"></span></span>
+            <span class="section-score" id="score-readability">--</span>
             <span class="chevron">&#9660;</span>
           </button>
-          <div class="section-body hidden" id="body-entity"></div>
-        </div>
-
-        <div class="section" id="section-eeat">
-          <button class="section-header" data-section="eeat">
-            <span class="section-icon" id="icon-eeat">&#9679;</span>
-            <span class="section-title">E-E-A-T Signals</span>
-            <span class="section-score" id="score-eeat">--</span>
-            <span class="chevron">&#9660;</span>
-          </button>
-          <div class="section-body hidden" id="body-eeat"></div>
+          <div class="section-body hidden" id="body-readability"></div>
         </div>
 
         <div class="section" id="section-citeability">
           <button class="section-header" data-section="citeability">
             <span class="section-icon" id="icon-citeability">&#9679;</span>
-            <span class="section-title">Content Citeability</span>
+            <span class="section-title">Citeability <span class="badge" id="badge-citeability"></span></span>
             <span class="section-score" id="score-citeability">--</span>
             <span class="chevron">&#9660;</span>
           </button>
           <div class="section-body hidden" id="body-citeability"></div>
         </div>
 
+        <div class="section" id="section-promotional">
+          <button class="section-header" data-section="promotional">
+            <span class="section-icon" id="icon-promotional">&#9679;</span>
+            <span class="section-title">Promotional Tone <span class="badge" id="badge-promotional"></span></span>
+            <span class="section-score" id="score-promotional">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-promotional"></div>
+        </div>
+
+        <div class="section" id="section-position">
+          <button class="section-header" data-section="position">
+            <span class="section-icon" id="icon-position">&#9679;</span>
+            <span class="section-title">Citation Position <span class="badge" id="badge-position"></span></span>
+            <span class="section-score" id="score-position">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-position"></div>
+        </div>
+
+        <div class="section" id="section-authority">
+          <button class="section-header" data-section="authority">
+            <span class="section-icon" id="icon-authority">&#9679;</span>
+            <span class="section-title">Source Authority <span class="badge" id="badge-authority"></span></span>
+            <span class="section-score" id="score-authority">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-authority"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Trust (Will AI trust you?) -->
+      <div class="tab-content" id="tab-trust">
+        <div class="tab-label">Will AI trust you?</div>
+
+        <div class="section" id="section-entity">
+          <button class="section-header open" data-section="entity">
+            <span class="section-icon" id="icon-entity">&#9679;</span>
+            <span class="section-title">Entity & Authority <span class="badge" id="badge-entity"></span></span>
+            <span class="section-score" id="score-entity">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body" id="body-entity"></div>
+        </div>
+
+        <div class="section" id="section-eeat">
+          <button class="section-header" data-section="eeat">
+            <span class="section-icon" id="icon-eeat">&#9679;</span>
+            <span class="section-title">E-E-A-T Signals <span class="badge" id="badge-eeat"></span></span>
+            <span class="section-score" id="score-eeat">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-eeat"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Technical (Can AI render you?) -->
+      <div class="tab-content" id="tab-technical">
+        <div class="tab-label">Can AI render you?</div>
+
         <div class="section" id="section-technical">
-          <button class="section-header" data-section="technical">
+          <button class="section-header open" data-section="technical">
             <span class="section-icon" id="icon-technical">&#9679;</span>
-            <span class="section-title">Technical AI-Readiness</span>
+            <span class="section-title">Technical AI-Readiness <span class="badge" id="badge-technical"></span></span>
             <span class="section-score" id="score-technical">--</span>
             <span class="chevron">&#9660;</span>
           </button>
-          <div class="section-body hidden" id="body-technical"></div>
+          <div class="section-body" id="body-technical"></div>
         </div>
 
         <div class="section" id="section-performance">
           <button class="section-header" data-section="performance">
             <span class="section-icon" id="icon-performance">&#9679;</span>
-            <span class="section-title">Page Performance</span>
+            <span class="section-title">Performance <span class="badge" id="badge-performance"></span></span>
             <span class="section-score" id="score-performance">--</span>
             <span class="chevron">&#9660;</span>
           </button>
           <div class="section-body hidden" id="body-performance"></div>
         </div>
+
+        <div class="section" id="section-freshness">
+          <button class="section-header" data-section="freshness">
+            <span class="section-icon" id="icon-freshness">&#9679;</span>
+            <span class="section-title">Content Freshness <span class="badge" id="badge-freshness"></span></span>
+            <span class="section-score" id="score-freshness">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-freshness"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Fixes -->
+      <div class="tab-content" id="tab-fixes">
+        <div class="tab-label">What to fix first</div>
+        <div id="body-fixes"></div>
       </div>
 
       <!-- Footer -->
       <div class="footer">
-        <span>AI Visibility Auditor v2</span>
         <span id="audit-time"></span>
       </div>
     </div>

@@ -62,8 +62,8 @@ body {
 
 .btn.copied { background: #ecfdf5; border-color: #22c55e; color: #16a34a; }
 
-.btn-print { background: #7c6cff; color: #fff; border-color: #7c6cff; }
-.btn-print:hover { background: #6b5ce7; }
+.btn-print { background: #e8453c; color: #fff; border-color: #e8453c; }
+.btn-print:hover { background: #c73530; }
 
 /* ─── Loading ─────────────────────────────── */
 .loading {
@@ -201,7 +201,7 @@ body {
 .check-pass { color: #16a34a; }
 .check-fail { color: #dc2626; }
 .check-warn { color: #ca8a04; }
-.check-info { color: #7c6cff; }
+.check-info { color: #e8453c; }
 
 .check-text { flex: 1; color: #4b5563; }
 .check-text strong { color: #111; font-weight: 600; }
@@ -330,18 +330,212 @@ body {
 }
 .validation-item::before { content: "! "; font-weight: 700; }
 
-/* ─── Footer ──────────────────────────────── */
+/* ─── Branded Footer ─────────────────────────── */
 .report-footer {
   text-align: center;
-  padding: 24px 0;
-  color: #aaa;
-  font-size: 12px;
+  margin-top: 32px;
+  padding: 32px 24px;
+  background: #f7f8fc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
 }
 
-/* ─── Print Styles ────────────────────────── */
+.footer-brand {
+  margin-bottom: 16px;
+}
+
+.footer-line1 {
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.footer-line1 strong { color: #111; }
+
+.footer-line2 {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.footer-line2 strong { color: #374151; }
+
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.footer-links a {
+  font-size: 13px;
+  color: #e8453c;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.footer-links a:hover { text-decoration: underline; }
+
+.footer-sep {
+  color: #d1d5db;
+  font-size: 13px;
+}
+
+.footer-cta {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border-left: 4px solid #059669;
+  padding: 16px 20px;
+  border-radius: 0 8px 8px 0;
+  margin: 0 auto 20px;
+  max-width: 600px;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.footer-cta em { font-style: italic; font-weight: 600; }
+
+.footer-cta a {
+  display: inline-block;
+  margin-top: 8px;
+  color: #059669;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.footer-cta a:hover { text-decoration: underline; }
+
+.footer-copyright {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* ─── Print Styles (bulletproof) ──────────── */
 @media print {
-  body { background: #fff; }
-  .header-actions { display: none; }
-  .report-section { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
-  .score-overview { break-inside: avoid; }
+  /* Reset backgrounds and shadows for clean print */
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  body {
+    background: #fff !important;
+    color: #111 !important;
+    font-size: 12px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #app { max-width: 100%; padding: 0; }
+
+  /* Hide interactive elements */
+  .header-actions { display: none !important; }
+  .btn, button { display: none !important; }
+
+  /* Show header as print header */
+  .report-header {
+    border-bottom: 2px solid #111;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  /* Score overview stays together on first page */
+  .score-overview {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .overall-score, .score-card {
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+
+  /* Every report section stays together — never splits mid-section */
+  .report-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #ddd !important;
+    margin-bottom: 12px;
+    padding: 16px;
+  }
+
+  /* If a section is too tall and MUST split, allow crawler table to break */
+  .crawler-table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  /* Recommendations stay together */
+  .rec-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Check items — keep pairs together but allow list to split */
+  .check-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Tags wrap cleanly */
+  .tag-list { break-inside: avoid; }
+
+  /* LLMs.txt preview — limit height, no scroll in print */
+  .llms-preview {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Validation list stays together */
+  .validation-list { break-inside: avoid; }
+
+  /* Colors print correctly */
+  .status-allowed { color: #16a34a !important; }
+  .status-blocked { color: #dc2626 !important; }
+  .status-partial { color: #ca8a04 !important; }
+  .check-pass { color: #16a34a !important; }
+  .check-fail { color: #dc2626 !important; }
+  .check-warn { color: #ca8a04 !important; }
+  .check-info { color: #6b21a8 !important; }
+  .rec-number.high { background: #dc2626 !important; color: #fff !important; }
+  .rec-number.medium { background: #ca8a04 !important; color: #fff !important; }
+  .rec-number.low { background: #16a34a !important; color: #fff !important; }
+  .crawler-type.search { background: #ecfdf5 !important; color: #16a34a !important; }
+  .crawler-type.training { background: #fffbeb !important; color: #ca8a04 !important; }
+
+  /* Links show URL in print */
+  .footer-links a::after {
+    content: " (" attr(href) ")";
+    font-size: 9px;
+    color: #888;
+    word-break: break-all;
+  }
+
+  /* Branded footer — always on its own last page */
+  .report-footer {
+    break-before: page;
+    page-break-before: always;
+    margin-top: 0;
+    border: none !important;
+    background: #fff !important;
+    padding-top: 40px;
+  }
+
+  .footer-cta {
+    border-left: 3px solid #059669 !important;
+    background: #f0fdf4 !important;
+  }
+
+  /* Page margins */
+  @page {
+    margin: 1.5cm 1.5cm 2cm 1.5cm;
+    size: A4;
+  }
+
+  /* First page — no top margin for header */
+  @page :first {
+    margin-top: 1cm;
+  }
 }

@@ -26,7 +26,12 @@
       technical: auditTechnical(),
       eeat: auditEEAT(),
       citeability: auditCiteability(),
-      performance: auditPerformance()
+      performance: auditPerformance(),
+      readability: auditReadability(),
+      promotional: auditPromotionalTone(),
+      pageType: detectPageType(),
+      citationPosition: auditCitationPosition(),
+      sourceAuthority: auditSourceAuthority()
     };
   }
 
@@ -178,20 +183,55 @@
       }
     });
 
-    const lists = document.querySelectorAll('ul, ol');
-    const tables = document.querySelectorAll('table');
+    // Filter lists — exclude nav menus, only count content lists
+    const contentArea = document.querySelector('main') || document.querySelector('article') || document.body;
+    const allLists = contentArea.querySelectorAll('ul, ol');
+    let listCount = 0;
+    allLists.forEach((list) => {
+      if (!list.closest('nav, header, footer, [role="navigation"], [role="banner"], [role="contentinfo"]')) listCount++;
+    });
+
+    // Filter tables — exclude layout tables (need at least 4 cells to be a data table)
+    const allTables = contentArea.querySelectorAll('table');
+    let tableCount = 0;
+    allTables.forEach((table) => {
+      if (!table.closest('nav, header, footer') && table.querySelectorAll('td, th').length >= 4) tableCount++;
+    });
+
+    // Filter headings — exclude hidden/aria-hidden
+    const visibleHeadings = [];
+    allHeadings.forEach((h) => {
+      const style = window.getComputedStyle(h);
+      if (style.display !== 'none' && style.visibility !== 'hidden' && h.getAttribute('aria-hidden') !== 'true') {
+        visibleHeadings.push(h);
+      }
+    });
+
+    // Full heading tree (limit to 30, visible only)
+    const headingTree = [];
+    let count = 0;
+    visibleHeadings.forEach((h) => {
+      if (count >= 30) return;
+      const level = parseInt(h.tagName[1]);
+      const text = (h.textContent || '').trim();
+      if (text.length > 0) {
+        headingTree.push({ level, text: text.substring(0, 80), isQuestion: faqPatterns.includes(text) });
+        count++;
+      }
+    });
 
     return {
       h1Count: h1s.length,
       h1Text: h1s.length > 0 ? (h1s[0].textContent || '').trim() : null,
       h2Count: h2s.length,
       h3Count: h3s.length,
-      totalHeadings: allHeadings.length,
+      totalHeadings: visibleHeadings.length,
       hierarchyClean,
       faqPatterns,
       faqCount: faqPatterns.length,
-      listCount: lists.length,
-      tableCount: tables.length
+      listCount,
+      tableCount,
+      headingTree
     };
   }
 
@@ -222,6 +262,21 @@
     const datePublished = getMetaContent('article:published_time') || getMetaContent('datePublished');
     const dateModified = getMetaContent('article:modified_time') || getMetaContent('dateModified');
 
+    // Meta robots noai/noimageai detection
+    const robotsLower = (robots || '').toLowerCase();
+    const hasNoAI = robotsLower.includes('noai');
+    const hasNoImageAI = robotsLower.includes('noimageai');
+
+    // Content freshness calculation
+    let freshnessDays = null;
+    const dateStr = dateModified || datePublished;
+    if (dateStr) {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        freshnessDays = Math.round((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+      }
+    }
+
     return {
       title,
       titleLength: title.length,
@@ -243,25 +298,49 @@
       datePublished,
       dateModified,
       hasDatePublished: !!datePublished,
-      hasDateModified: !!dateModified
+      hasDateModified: !!dateModified,
+      hasNoAI,
+      hasNoImageAI,
+      freshnessDays
     };
   }
 
   // ─── 4. Content Analysis ───────────────────────────────────
   function auditContent() {
-    const mainContent =
-      document.querySelector('main') ||
-      document.querySelector('article') ||
-      document.querySelector('[role="main"]') ||
-      document.body;
+    const hasMain = !!document.querySelector('main');
+    const hasArticle = !!document.querySelector('article');
 
-    const text = (mainContent.innerText || '').trim();
+    // Try multiple sources for text content (some frameworks render late)
+    let text = '';
+
+    // Priority 1: main or article element
+    const mainEl = document.querySelector('main') || document.querySelector('article') || document.querySelector('[role="main"]');
+    if (mainEl) {
+      text = (mainEl.innerText || mainEl.textContent || '').trim();
+    }
+
+    // Priority 2: if main gave nothing, try body
+    if (text.length < 50) {
+      text = (document.body.innerText || document.body.textContent || '').trim();
+    }
+
+    // Priority 3: if still empty, gather all visible text from paragraphs, headings, lists
+    if (text.length < 50) {
+      const els = document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, td, th, span, div');
+      const parts = [];
+      els.forEach((el) => {
+        const t = (el.textContent || '').trim();
+        if (t.length > 2 && el.children.length === 0) parts.push(t);
+      });
+      text = parts.join(' ');
+    }
+
     const words = text.split(/\s+/).filter((w) => w.length > 0);
 
     return {
       wordCount: words.length,
-      hasMainElement: !!document.querySelector('main'),
-      hasArticleElement: !!document.querySelector('article')
+      hasMainElement: hasMain,
+      hasArticleElement: hasArticle
     };
   }
 
@@ -342,11 +421,34 @@
 
   // ─── 6. Technical AI-Readiness ─────────────────────────────
   function auditTechnical() {
-    const images = document.querySelectorAll('img');
+    const allImages = document.querySelectorAll('img');
     let imagesWithAlt = 0;
     let imagesWithoutAlt = 0;
+    let totalImages = 0;
+    let skippedImages = 0;
 
-    images.forEach((img) => {
+    allImages.forEach((img) => {
+      // Skip tracking pixels, spacers, and invisible images
+      const w = img.naturalWidth || img.width || parseInt(img.getAttribute('width')) || 0;
+      const h = img.naturalHeight || img.height || parseInt(img.getAttribute('height')) || 0;
+      const src = (img.getAttribute('src') || '').toLowerCase();
+      const style = window.getComputedStyle(img);
+
+      // Skip: 1x1 pixels, display:none, visibility:hidden, data URIs that are tiny, no src
+      if ((w <= 2 && h <= 2) ||
+          style.display === 'none' ||
+          style.visibility === 'hidden' ||
+          (src.startsWith('data:') && src.length < 200) ||
+          src === '' ||
+          src.includes('pixel') ||
+          src.includes('spacer') ||
+          src.includes('tracking') ||
+          src.includes('1x1')) {
+        skippedImages++;
+        return;
+      }
+
+      totalImages++;
       const alt = (img.getAttribute('alt') || '').trim();
       if (alt.length > 0) {
         imagesWithAlt++;
@@ -355,17 +457,29 @@
       }
     });
 
+    const images = { length: totalImages };
+
     const allLinks = document.querySelectorAll('a[href]');
     let internalLinks = 0;
     let externalLinks = 0;
     const origin = window.location.origin;
 
+    // Skip CDN, tracking, and non-content links
+    const skipDomains = ['cdn.', 'fonts.', 'analytics.', 'pixel.', 'tracking.', 'googletagmanager.', 'doubleclick.', 'googlesyndication.'];
+
     allLinks.forEach((a) => {
       const href = a.getAttribute('href') || '';
+      const style = window.getComputedStyle(a);
+      // Skip hidden links
+      if (style.display === 'none' || style.visibility === 'hidden') return;
+      // Skip javascript: and mailto: and tel:
+      if (href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
       if (href.startsWith('/') || href.startsWith(origin)) {
         internalLinks++;
       } else if (href.startsWith('http')) {
-        externalLinks++;
+        const isSkip = skipDomains.some((d) => href.includes(d));
+        if (!isSkip) externalLinks++;
       }
     });
 
@@ -377,10 +491,11 @@
     const sitemapLink = document.querySelector('link[rel="sitemap"]');
 
     return {
-      totalImages: images.length,
+      totalImages,
+      skippedImages,
       imagesWithAlt,
       imagesWithoutAlt,
-      altTextRatio: images.length > 0 ? Math.round((imagesWithAlt / images.length) * 100) : 100,
+      altTextRatio: totalImages > 0 ? Math.round((imagesWithAlt / totalImages) * 100) : 100,
       internalLinks,
       externalLinks,
       hasJSFramework: hasReactRoot,
@@ -570,6 +685,43 @@
       }
     }
 
+    // Answer capsule detection: paragraphs 40-70 words, starts with definition/answer pattern, self-contained
+    let answerCapsuleCount = 0;
+    const definitionStarters = /^[A-Z][\w\s]{2,40}\b\s+(is|are|refers to|means|describes|represents|involves|was|were)\s/;
+    paragraphs.forEach((p) => {
+      const pText = (p.textContent || '').trim();
+      if (pText.length < 50) return;
+      const pWords = pText.split(/\s+/).filter((w) => w.length > 0);
+      if (pWords.length >= 40 && pWords.length <= 70 && definitionStarters.test(pText)) {
+        answerCapsuleCount++;
+      }
+    });
+
+    // Stat attribution quality
+    let attributedStats = 0;
+    let unattributedStats = 0;
+    const allStats = bodyText.match(/\d+(\.\d+)?(%|\s*percent|\s*million|\s*billion|\s*thousand)/gi) || [];
+    allStats.forEach((stat) => {
+      // Find position of stat in bodyText
+      const idx = bodyText.indexOf(stat);
+      if (idx === -1) return;
+      const after = bodyText.substring(idx, idx + stat.length + 100);
+      if (/\([\w\s]+,?\s*\d{4}\)/.test(after)) {
+        attributedStats++;
+      } else {
+        unattributedStats++;
+      }
+    });
+
+    // Fact density: count verifiable claims per 100 words
+    const wordCount = bodyText.split(/\s+/).filter((w) => w.length > 0).length;
+    let factCount = 0;
+    // Numbers with context
+    factCount += (bodyText.match(/\d+(\.\d+)?(%|\s*percent|\s*million|\s*billion|\s*thousand|\s*kg|\s*miles|\s*km|\s*years)/gi) || []).length;
+    // Cited sources (parenthetical citations)
+    factCount += (bodyText.match(/\([\w\s]+,?\s*\d{4}\)/g) || []).length;
+    const factDensity = wordCount > 0 ? Math.round((factCount / wordCount) * 10000) / 100 : 0;
+
     return {
       totalParagraphs,
       shortParagraphs,
@@ -581,11 +733,231 @@
       hasSummary,
       blockquoteCount: blockquotes.length,
       listItemCount,
-      firstParaAnswers
+      firstParaAnswers,
+      answerCapsuleCount,
+      attributedStats,
+      unattributedStats,
+      factDensity
     };
   }
 
-  // ─── 9. Performance Quick Check (NEW) ──────────────────────
+  // ─── 9. Readability Scoring (NEW v2.1) ─────────────────────
+  function auditReadability() {
+    const mainContent =
+      document.querySelector('main') ||
+      document.querySelector('article') ||
+      document.querySelector('[role="main"]') ||
+      document.body;
+
+    const text = (mainContent.innerText || '').trim();
+    const words = text.split(/\s+/).filter((w) => w.length > 0);
+    const wordCount = words.length;
+    if (wordCount < 10) {
+      return { ari: 0, gradeLevel: 'N/A', avgSentenceLength: 0, passiveVoicePercent: 0, passiveCount: 0, sentenceCount: 0 };
+    }
+
+    const chars = text.replace(/[^a-zA-Z0-9]/g, '').length;
+    const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 5);
+    const sentenceCount = Math.max(sentences.length, 1);
+
+    // ARI formula
+    const ari = 4.71 * (chars / wordCount) + 0.5 * (wordCount / sentenceCount) - 21.43;
+    const ariRounded = Math.round(ari * 10) / 10;
+
+    // Grade level from ARI
+    let gradeLevel = 'College+';
+    if (ari <= 1) gradeLevel = 'K';
+    else if (ari <= 13) gradeLevel = 'Grade ' + Math.ceil(ari);
+    else gradeLevel = 'College+';
+
+    const avgSentenceLength = Math.round((wordCount / sentenceCount) * 10) / 10;
+
+    // Passive voice detection
+    const passiveRegex = /\b(is|are|was|were|been|being)\s+(being\s+)?\w+(ed|en)\b/gi;
+    const exclusions = ['interested', 'excited', 'pleased', 'concerned', 'experienced', 'surprised', 'used', 'supposed', 'based', 'related', 'married', 'divorced', 'retired'];
+    let passiveCount = 0;
+    let match;
+    while ((match = passiveRegex.exec(text)) !== null) {
+      const matchedWords = match[0].toLowerCase().split(/\s+/);
+      const lastWord = matchedWords[matchedWords.length - 1];
+      const isExcluded = exclusions.some((e) => lastWord.startsWith(e));
+      if (!isExcluded) passiveCount++;
+    }
+    const passiveVoicePercent = sentenceCount > 0 ? Math.round((passiveCount / sentenceCount) * 100) : 0;
+
+    return {
+      ari: ariRounded,
+      gradeLevel,
+      avgSentenceLength,
+      passiveVoicePercent,
+      passiveCount,
+      sentenceCount
+    };
+  }
+
+  // ─── 10. Promotional Tone Detector (NEW v2.1) ─────────────
+  function auditPromotionalTone() {
+    const mainContent =
+      document.querySelector('main') ||
+      document.querySelector('article') ||
+      document.querySelector('[role="main"]') ||
+      document.body;
+
+    const text = (mainContent.innerText || '').trim();
+    const words = text.split(/\s+/).filter((w) => w.length > 0);
+    const wordCount = words.length;
+    if (wordCount < 20) {
+      return { score: 100, brandRatio: 0, brandCount: 0, unsupportedSuperlatives: 0, ctaDensity: 0, ctaCount: 0, benefitFactRatio: 0, comparativeCount: 0 };
+    }
+
+    const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 5);
+    const sentenceCount = Math.max(sentences.length, 1);
+
+    // Signal 1: Brand-centric language ratio
+    const brandMatches = text.match(/\b(our|we|my)\s+(service|product|team|approach|solution|method|tool|platform|company|brand|offer|experience|expertise)\b/gi) || [];
+    const brandCount = brandMatches.length;
+    const brandRatio = Math.round((brandCount / sentenceCount) * 100);
+
+    // Signal 2: Unsupported superlatives
+    const superlativeRegex = /\b(best-in-class|industry-leading|world-class|cutting-edge|proven|guaranteed|unmatched|unparalleled|top-rated|award-winning|leading|premier|elite)\b/gi;
+    const superlativeMatches = [];
+    let supMatch;
+    while ((supMatch = superlativeRegex.exec(text)) !== null) {
+      superlativeMatches.push(supMatch);
+    }
+    let unsupportedSuperlatives = 0;
+    superlativeMatches.forEach((m) => {
+      const after = text.substring(m.index, m.index + m[0].length + 150);
+      if (!/\(.+\d{4}\)/.test(after)) {
+        unsupportedSuperlatives++;
+      }
+    });
+
+    // Signal 3: CTA density
+    const ctaMatches = text.match(/\b(get started|sign up|book a|contact us|try .{0,10}free|download now|learn more|request a demo|schedule|buy now|order now|start now|join now)\b/gi) || [];
+    const ctaCount = ctaMatches.length;
+    const ctaDensity = wordCount > 0 ? Math.round((ctaCount / (wordCount / 1000)) * 10) / 10 : 0;
+
+    // Signal 4: Benefit-fact ratio
+    const benefitMatches = text.match(/\b(helps you|saves you|enables you|allows you|designed to|built for|so you can|giving you|empowers you)\b/gi) || [];
+    const statPatterns = text.match(/\d+(\.\d+)?(%|\s*percent|\s*million|\s*billion|\s*thousand)/gi) || [];
+    const citationPatterns = text.match(/\([\w\s]+,?\s*\d{4}\)/g) || [];
+    const factPatternCount = statPatterns.length + citationPatterns.length;
+    const benefitFactRatio = factPatternCount > 0 ? Math.round((benefitMatches.length / factPatternCount) * 100) / 100 : (benefitMatches.length > 0 ? 1.0 : 0);
+
+    // Signal 5: Comparative self-promotion
+    const comparativeMatches = text.match(/\b(unlike (others|competitors|other tools)|better than|more than just|not like other|the only .{0,20} that|what sets us apart|why choose us)\b/gi) || [];
+    const comparativeCount = comparativeMatches.length;
+
+    // Scoring: start at 100, deduct per signal
+    let score = 100;
+    if (brandRatio > 15) score -= 30;
+    else if (brandRatio >= 5) score -= 15;
+
+    if (unsupportedSuperlatives >= 4) score -= 25;
+    else if (unsupportedSuperlatives >= 1) score -= 12;
+
+    if (ctaDensity >= 4) score -= 20;
+    else if (ctaDensity >= 2) score -= 10;
+
+    if (benefitFactRatio > 0.6) score -= 20;
+    else if (benefitFactRatio >= 0.3) score -= 10;
+
+    if (comparativeCount >= 3) score -= 15;
+    else if (comparativeCount >= 1) score -= 8;
+
+    score = Math.max(0, Math.min(100, score));
+
+    return {
+      score,
+      brandRatio,
+      brandCount,
+      unsupportedSuperlatives,
+      ctaDensity,
+      ctaCount,
+      benefitFactRatio,
+      comparativeCount
+    };
+  }
+
+  // ─── 11. Page Type Detection (NEW v2.1) ───────────────────
+  function detectPageType() {
+    const url = window.location.pathname.toLowerCase();
+    const schema = document.querySelectorAll('script[type="application/ld+json"]');
+    const ogType = (document.querySelector('meta[property="og:type"]') || {}).content || '';
+    const hasArticleTag = !!document.querySelector('article');
+    const bodyText = (document.body.innerText || '').toLowerCase();
+
+    let schemaTypes = [];
+    schema.forEach((s) => {
+      try {
+        const json = JSON.parse(s.textContent || '');
+        const items = Array.isArray(json) ? json : [json];
+        items.forEach((item) => {
+          if (item['@type']) {
+            const types = Array.isArray(item['@type']) ? item['@type'] : [item['@type']];
+            schemaTypes.push(...types);
+          }
+          if (item['@graph'] && Array.isArray(item['@graph'])) {
+            item['@graph'].forEach((g) => {
+              if (g['@type']) {
+                const types = Array.isArray(g['@type']) ? g['@type'] : [g['@type']];
+                schemaTypes.push(...types);
+              }
+            });
+          }
+        });
+      } catch (e) { /* skip */ }
+    });
+
+    const hasDatePublished = !!(document.querySelector('meta[property="article:published_time"]') || document.querySelector('meta[name="datePublished"]'));
+    const hasAuthor = !!document.querySelector('meta[name="author"]');
+
+    let type = 'general';
+
+    // Homepage detection
+    if (url === '/' || url === '' || url === '/index.html' || url === '/index.php') {
+      type = 'homepage';
+    } else if (schemaTypes.includes('Organization') && (url === '/' || url === '')) {
+      type = 'homepage';
+    } else if (ogType === 'website' && (url === '/' || url === '')) {
+      type = 'homepage';
+    }
+
+    // Blog/article detection
+    if (schemaTypes.includes('Article') || schemaTypes.includes('BlogPosting') || schemaTypes.includes('NewsArticle')) {
+      type = 'blog';
+    } else if (hasArticleTag && (hasDatePublished || hasAuthor)) {
+      type = 'blog';
+    } else if (url.includes('/blog/') || url.includes('/post/') || url.includes('/article/')) {
+      type = 'blog';
+    }
+
+    // Product detection
+    if (schemaTypes.includes('Product')) {
+      type = 'product';
+    } else if (url.includes('/product/') || url.includes('/shop/') || url.includes('/store/')) {
+      type = 'product';
+    }
+
+    // Service detection
+    if (url.includes('/service') || url.includes('/services')) {
+      type = 'service';
+    } else if (schemaTypes.includes('LocalBusiness') || schemaTypes.includes('ProfessionalService')) {
+      type = 'service';
+    }
+
+    // YMYL detection
+    const ymylTerms = ['diagnosis', 'prescription', 'investment', 'attorney', 'lawsuit', 'insurance claim', 'medication', 'treatment plan', 'financial advice', 'legal advice', 'medical advice', 'tax filing', 'mortgage', 'bankruptcy'];
+    let isYMYL = false;
+    ymylTerms.forEach((term) => {
+      if (bodyText.includes(term)) isYMYL = true;
+    });
+
+    return { type, isYMYL };
+  }
+
+  // ─── 12. Performance Quick Check (NEW) ──────────────────────
   function auditPerformance() {
     const perf = window.performance;
     let domContentLoaded = null;
@@ -636,5 +1008,92 @@
       renderBlockingCSS: renderBlockingCSS.length,
       renderBlockingJS: renderBlockingJS.length
     };
+  }
+
+  // ─── 13. Citation Position (NEW) ──────────────────────────
+  function auditCitationPosition() {
+    const mainContent =
+      document.querySelector('main') ||
+      document.querySelector('article') ||
+      document.querySelector('[role="main"]') ||
+      document.body;
+
+    const text = (mainContent.innerText || '').trim();
+    const words = text.split(/\s+/).filter((w) => w.length > 0);
+    const totalWordCount = words.length;
+    if (totalWordCount < 30) {
+      return { zone1DefinitionCount: 0, zone1StatCount: 0, zone1AttributionCount: 0, zone1HasDirectAnswer: false, zone1WordCount: 0, totalWordCount, zone1Percentage: 0 };
+    }
+
+    // Split into zone 1 (first 30%)
+    const zone1End = Math.floor(totalWordCount * 0.3);
+    const zone1Text = words.slice(0, zone1End).join(' ');
+    const zone1WordCount = zone1End;
+
+    // Definition patterns in zone 1
+    const zone1Definitions = zone1Text.match(/\b[A-Z][\w\s]{2,40}\b\s+(is|are|refers to|means|describes)\s/g) || [];
+    const zone1DefinitionCount = zone1Definitions.length;
+
+    // Statistics in zone 1
+    const zone1Stats = zone1Text.match(/\d+(\.\d+)?(%|\s*percent|\s*million|\s*billion)/g) || [];
+    const zone1StatCount = zone1Stats.length;
+
+    // Attribution in zone 1
+    const zone1Attributions = zone1Text.match(/\([^)]*\d{4}[^)]*\)/g) || [];
+    const zone1AttributionCount = zone1Attributions.length;
+
+    // First paragraph direct answer check
+    let zone1HasDirectAnswer = false;
+    const firstPara = mainContent.querySelector('p');
+    if (firstPara) {
+      const fpText = (firstPara.textContent || '').trim();
+      if (fpText.length > 30 && (fpText.includes(' is ') || fpText.includes(' are '))) {
+        zone1HasDirectAnswer = true;
+      }
+    }
+
+    // What % of key signals are in zone 1
+    const totalDefs = (text.match(/\b[A-Z][\w\s]{2,40}\b\s+(is|are|refers to|means|describes)\s/g) || []).length;
+    const totalStats = (text.match(/\d+(\.\d+)?(%|\s*percent|\s*million|\s*billion)/g) || []).length;
+    const totalAttrs = (text.match(/\([^)]*\d{4}[^)]*\)/g) || []).length;
+    const totalSignals = totalDefs + totalStats + totalAttrs;
+    const zone1Signals = zone1DefinitionCount + zone1StatCount + zone1AttributionCount;
+    const zone1Percentage = totalSignals > 0 ? Math.round((zone1Signals / totalSignals) * 100) : 0;
+
+    return {
+      zone1DefinitionCount,
+      zone1StatCount,
+      zone1AttributionCount,
+      zone1HasDirectAnswer,
+      zone1WordCount,
+      totalWordCount,
+      zone1Percentage
+    };
+  }
+
+  // ─── 14. Source Authority (NEW) ────────────────────────────
+  function auditSourceAuthority() {
+    const links = document.querySelectorAll('a[href]');
+    const origin = window.location.origin;
+
+    const highAuthority = ['gov', 'edu', 'wikipedia.org', 'who.int', 'nature.com', 'sciencedirect.com', 'pubmed.ncbi', 'nih.gov', 'reuters.com', 'bbc.com', 'nytimes.com', 'washingtonpost.com', 'theguardian.com'];
+    const mediumAuthority = ['semrush.com', 'ahrefs.com', 'hubspot.com', 'mckinsey.com', 'gartner.com', 'statista.com', 'forbes.com', 'techcrunch.com', 'harvard.edu', 'mit.edu', 'stanford.edu', 'oxford.ac.uk', 'springer.com', 'wiley.com', 'ieee.org', 'acm.org'];
+
+    let highCount = 0, mediumCount = 0, lowCount = 0;
+
+    links.forEach((a) => {
+      const href = (a.getAttribute('href') || '').toLowerCase();
+      if (!href.startsWith('http') || href.includes(origin.toLowerCase())) return;
+
+      if (highAuthority.some(d => href.includes(d)) || href.match(/\.gov(\/|$)/) || href.match(/\.edu(\/|$)/)) {
+        highCount++;
+      } else if (mediumAuthority.some(d => href.includes(d))) {
+        mediumCount++;
+      } else {
+        lowCount++;
+      }
+    });
+
+    return { highCount, mediumCount, lowCount, totalExternal: highCount + mediumCount + lowCount };
   }
 })();

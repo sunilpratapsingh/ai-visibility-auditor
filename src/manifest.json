@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AI Visibility Auditor",
-  "version": "2.0.0",
-  "description": "Audit any webpage for AI/LLM readiness. Check robots.txt, schema, llms.txt, E-E-A-T, and citeability.",
+  "version": "2.1.0",
+  "description": "120-point AI visibility audit. 20 crawlers, 30 schema types, E-E-A-T, citeability & promotional tone. Deepest free check.",
   "permissions": [
     "activeTab",
     "scripting",
