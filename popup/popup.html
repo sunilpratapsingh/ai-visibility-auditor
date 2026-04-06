@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Visibility Auditor</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <svg class="logo" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
+        <span class="header-title">AI Visibility Auditor</span>
+      </div>
+      <span class="version">v2.0</span>
+    </header>
+
+    <!-- Loading State -->
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Auditing page...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="error hidden">
+      <p id="error-message"></p>
+      <button id="retry-btn" class="btn-retry">Retry</button>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="hidden">
+      <!-- URL Bar -->
+      <div class="url-bar">
+        <span id="page-url" class="url-text"></span>
+      </div>
+
+      <!-- Overall Score -->
+      <div class="score-card" id="score-card">
+        <div class="score-ring" id="score-ring">
+          <svg viewBox="0 0 100 100">
+            <circle class="score-bg" cx="50" cy="50" r="42"/>
+            <circle class="score-fill" id="score-fill" cx="50" cy="50" r="42"
+              stroke-dasharray="264" stroke-dashoffset="264"/>
+          </svg>
+          <div class="score-number" id="score-number">0</div>
+        </div>
+        <div class="score-info">
+          <div class="score-label" id="score-label">Analyzing...</div>
+          <div class="score-detail" id="score-detail"></div>
+          <div class="action-buttons">
+            <button class="btn-action" id="btn-copy" title="Copy report as markdown">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+            <button class="btn-action" id="btn-export" title="Export as JSON">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              JSON
+            </button>
+            <button class="btn-action btn-primary" id="btn-fullreport" title="Open full report in new tab">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              Full Report
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Fixes -->
+      <div class="section fixes-section" id="section-fixes">
+        <button class="section-header open" data-section="fixes">
+          <span class="section-icon" style="color:#f59e0b">&#9733;</span>
+          <span class="section-title">Top Fixes (by impact)</span>
+          <span class="chevron">&#9660;</span>
+        </button>
+        <div class="section-body" id="body-fixes"></div>
+      </div>
+
+      <!-- Category Sections -->
+      <div class="sections">
+        <div class="section" id="section-robots">
+          <button class="section-header" data-section="robots">
+            <span class="section-icon" id="icon-robots">&#9679;</span>
+            <span class="section-title">Robots & Crawler Access</span>
+            <span class="section-score" id="score-robots">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-robots"></div>
+        </div>
+
+        <div class="section" id="section-llms">
+          <button class="section-header" data-section="llms">
+            <span class="section-icon" id="icon-llms">&#9679;</span>
+            <span class="section-title">LLMs.txt</span>
+            <span class="section-score" id="score-llms">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-llms"></div>
+        </div>
+
+        <div class="section" id="section-schema">
+          <button class="section-header" data-section="schema">
+            <span class="section-icon" id="icon-schema">&#9679;</span>
+            <span class="section-title">Schema & Structured Data</span>
+            <span class="section-score" id="score-schema">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-schema"></div>
+        </div>
+
+        <div class="section" id="section-content">
+          <button class="section-header" data-section="content">
+            <span class="section-icon" id="icon-content">&#9679;</span>
+            <span class="section-title">Content Structure</span>
+            <span class="section-score" id="score-content">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-content"></div>
+        </div>
+
+        <div class="section" id="section-entity">
+          <button class="section-header" data-section="entity">
+            <span class="section-icon" id="icon-entity">&#9679;</span>
+            <span class="section-title">Entity & Authority</span>
+            <span class="section-score" id="score-entity">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-entity"></div>
+        </div>
+
+        <div class="section" id="section-eeat">
+          <button class="section-header" data-section="eeat">
+            <span class="section-icon" id="icon-eeat">&#9679;</span>
+            <span class="section-title">E-E-A-T Signals</span>
+            <span class="section-score" id="score-eeat">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-eeat"></div>
+        </div>
+
+        <div class="section" id="section-citeability">
+          <button class="section-header" data-section="citeability">
+            <span class="section-icon" id="icon-citeability">&#9679;</span>
+            <span class="section-title">Content Citeability</span>
+            <span class="section-score" id="score-citeability">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-citeability"></div>
+        </div>
+
+        <div class="section" id="section-technical">
+          <button class="section-header" data-section="technical">
+            <span class="section-icon" id="icon-technical">&#9679;</span>
+            <span class="section-title">Technical AI-Readiness</span>
+            <span class="section-score" id="score-technical">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-technical"></div>
+        </div>
+
+        <div class="section" id="section-performance">
+          <button class="section-header" data-section="performance">
+            <span class="section-icon" id="icon-performance">&#9679;</span>
+            <span class="section-title">Page Performance</span>
+            <span class="section-score" id="score-performance">--</span>
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="section-body hidden" id="body-performance"></div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <span>AI Visibility Auditor v2</span>
+        <span id="audit-time"></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

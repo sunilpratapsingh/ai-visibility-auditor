@@ -1,0 +1,36 @@
+{
+  "name": "ai-visibility-auditor",
+  "version": "2.0.0",
+  "description": "Chrome extension — 120-point AI visibility audit. Crawlers, schema, E-E-A-T, citeability, promotional tone.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint src/ --ext .js",
+    "lint:fix": "eslint src/ --ext .js --fix",
+    "format": "prettier --write \"src/**/*.{js,css,html}\"",
+    "format:check": "prettier --check \"src/**/*.{js,css,html}\"",
+    "build": "node scripts/build.js",
+    "build:zip": "node scripts/pack.js",
+    "test": "node --test tests/scoring.test.js tests/detection.test.js",
+    "test:scoring": "node --test tests/scoring.test.js",
+    "test:detection": "node --test tests/detection.test.js",
+    "validate": "node scripts/validate-manifest.js",
+    "version:bump": "node scripts/version-bump.js",
+    "precommit": "npm run lint && npm run format:check && npm run test && npm run validate",
+    "release": "npm run precommit && npm run build && npm run build:zip"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.4.0",
+    "archiver": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": "Sunil Pratap Singh <suniltomar85@gmail.com>",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sunilpratapsingh/ai-visibility-auditor.git"
+  }
+}
