@@ -365,14 +365,31 @@ function renderDetailEEAT(data) {
   const body = document.getElementById('detail-eeat-body');
   const ee = data.page.eeat;
   const e = data.page.entity;
+  const pt = (data.page.pageType && data.page.pageType.type) || 'general';
+  const isYMYL = data.page.pageType && data.page.pageType.isYMYL;
   let html = '';
 
-  html += ci(ee.hasAuthorByline ? 'pass' : 'fail', ee.hasAuthorByline ? 'Author byline detected' : 'No author byline');
+  const ptLabels = {
+    blog: 'Blog — author, date, and citations weighted heavily',
+    product: 'Product — reviews, trust badges, and policies weighted heavily',
+    homepage: 'Homepage — trust pages, policies, and org trust weighted heavily',
+    service: 'Service — credentials, trust badges, and policies weighted heavily',
+    general: 'General — balanced E-E-A-T weighting'
+  };
+  html += '<p style="font-size:13px;color:#666;margin:0 0 12px;"><strong>Scoring profile:</strong> ' + (ptLabels[pt] || ptLabels.general);
+  if (isYMYL) html += ' · <span style="color:#d97706;">YMYL extra scrutiny applied</span>';
+  html += '</p>';
+
+  const authorLevel = pt === 'blog' || pt === 'general' ? 'fail' : 'warn';
+  html += ci(ee.hasAuthorByline ? 'pass' : authorLevel, ee.hasAuthorByline ? 'Author byline detected' : 'No author byline');
   html += ci(ee.hasAuthorBio ? 'pass' : 'warn', ee.hasAuthorBio ? 'Author bio found' : 'No author bio');
-  html += ci(ee.hasVisibleDate ? 'pass' : 'warn', ee.hasVisibleDate ? 'Publication date visible' : 'No visible date');
-  html += ci(ee.hasCredentials ? 'pass' : 'info', ee.hasCredentials ? 'Credentials mentioned' : 'No credentials detected');
+  const dateLevel = pt === 'homepage' ? 'info' : 'warn';
+  html += ci(ee.hasVisibleDate ? 'pass' : dateLevel, ee.hasVisibleDate ? 'Publication date visible' : 'No visible date');
+  const credLevel = isYMYL ? 'fail' : (pt === 'service' ? 'warn' : 'info');
+  html += ci(ee.hasCredentials ? 'pass' : credLevel, ee.hasCredentials ? 'Credentials mentioned' : 'No credentials detected');
   html += ci(ee.citedSources >= 3 ? 'pass' : ee.citedSources >= 1 ? 'warn' : 'fail', `<strong>${ee.citedSources}</strong> external citations`);
-  html += ci(e.hasPrivacyLink ? 'pass' : 'warn', e.hasPrivacyLink ? 'Privacy policy link' : 'No privacy policy');
+  const privacyLevel = pt === 'homepage' || pt === 'product' ? 'fail' : 'warn';
+  html += ci(e.hasPrivacyLink ? 'pass' : privacyLevel, e.hasPrivacyLink ? 'Privacy policy link' : 'No privacy policy');
   html += ci(e.hasTermsLink ? 'pass' : 'info', e.hasTermsLink ? 'Terms of service link' : 'No terms link');
   html += ci(ee.hasEditorialPolicy ? 'pass' : 'info', ee.hasEditorialPolicy ? 'Editorial policy found' : 'No editorial policy');
   html += ci(ee.hasReviewedBy || ee.hasFactCheckClaim ? 'pass' : 'info', ee.hasReviewedBy || ee.hasFactCheckClaim ? 'Review/fact-check signals' : 'No review signals');

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AI Visibility Auditor",
   "version": "2.1.0",
-  "description": "120-point AI visibility audit. 20 crawlers, 30 schema types, E-E-A-T, citeability & promotional tone. Deepest free check.",
+  "description": "130+ point AI & LLM visibility audit. 20 crawlers, 30 schema types, adaptive E-E-A-T, citeability & tone. Free.",
   "permissions": [
     "activeTab",
     "scripting",

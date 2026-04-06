@@ -1,0 +1,92 @@
+The deepest free AI & LLM visibility audit for any webpage. One click. 130+ checks. Zero data collection.
+
+AI Visibility Auditor analyzes any page across 15 categories and tells you exactly how visible it is to LLMs and AI systems like ChatGPT, Perplexity, Claude, Gemini, and Google AI Overviews.
+
+━━━ WHAT IT CHECKS ━━━
+
+LAYER 1: CAN AI FIND YOU?
+- 20 AI crawlers tracked (GPTBot, ClaudeBot, PerplexityBot, DeepSeekBot, GrokBot & more)
+- Training vs search crawler distinction
+- robots.txt parsing with crawl-delay detection
+- llms.txt & llms-full.txt validation (structure, headings, links)
+- Sitemap.xml multi-format discovery & validation
+- Meta robots / noai / noimageai directives
+- NDJSON/JSONL feed detection
+- .well-known/ai-plugin.json, security.txt, humans.txt
+
+LAYER 2: CAN AI UNDERSTAND YOU?
+- Schema validation for 30+ types (Article, Product, FAQ, HowTo, Organization & more)
+- Schema completeness scoring per type
+- Speakable markup detection
+- Content structure analysis (heading hierarchy, FAQ patterns, lists, tables)
+- Readability scoring (ARI formula)
+- Passive voice & sentence length analysis
+
+LAYER 3: WILL AI TRUST YOU?
+- Page-type adaptive E-E-A-T scoring (Blog, Product, Service, Homepage profiles)
+- YMYL detection with extra scrutiny penalties
+- Author byline, bio, credentials detection
+- External citation counting
+- Editorial policy & fact-check signals
+- Trust badges & review signals
+- Entity & authority signals (Open Graph, sameAs, canonical, social links)
+
+LAYER 4: WILL AI QUOTE YOU?
+- Answer capsule detection (40-60 word self-contained blocks)
+- Stat attribution quality (stats with source names)
+- Fact density scoring
+- Definition pattern detection
+- Promotional tone analysis (5 research-backed signals)
+- Brand-centric language ratio
+- Unsupported superlative detection
+- CTA density measurement
+
+LAYER 5: CAN AI RENDER YOU?
+- Semantic HTML validation
+- Alt text coverage
+- Internal & external link analysis
+- Content freshness signals
+- Page performance metrics
+
+━━━ WHAT YOU GET ━━━
+
+- Overall AI visibility score (0-100) with category breakdown
+- Top fixes sorted by score impact with effort estimates
+- Page type detection (Blog, Product, Service, Homepage)
+- YMYL content detection with extra scrutiny
+- Detailed audit results for every category
+- Full report page (opens in new tab, printable)
+- Markdown copy & JSON export
+- Source authority analysis
+
+━━━ WHAT MAKES IT DIFFERENT ━━━
+
+- Adaptive E-E-A-T: Different page types get different scoring weights. LLMs evaluate blog posts differently from product pages. We score accordingly.
+- Promotional tone detector: Based on research showing promotional tone has a -26% negative correlation with LLM citations. We measure 5 specific signals.
+- 20 AI & LLM crawlers: Not just GPTBot — we check DeepSeekBot, GrokBot, Meta-ExternalAgent, Applebot-Extended, and 15 more.
+- Zero data collection: Everything runs in your browser. No accounts. No API calls. No data leaves your machine. Works offline after install.
+- Completely free: No premium tier. No limits. No upsells.
+
+━━━ WHO IT'S FOR ━━━
+
+- SEO professionals optimizing for AI search & LLM visibility (SGE, AI Overviews, Perplexity)
+- Content creators who want LLMs and AI systems to cite their work
+- Website owners checking their AI & LLM readiness
+- Digital marketers tracking AI crawler access
+- Developers implementing structured data for LLM consumption
+
+━━━ NEW IN v2.1 ━━━
+
+- Page-type adaptive E-E-A-T scoring (5 profiles)
+- YMYL detection with extra scrutiny penalties
+- 3 new AI crawlers: DeepSeekBot, GrokBot, Meta-ExternalAgent
+- Readability scoring (ARI + passive voice + sentence length)
+- Promotional tone detector (5 signals)
+- llms.txt format validation
+- Sitemap multi-format discovery
+- Source authority analysis
+- Content freshness signals
+- New brand icon and light theme UI
+
+Built by Sunil Pratap Singh — SEO & AI Visibility Consultant
+sunilpratapsingh.com

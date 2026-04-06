@@ -177,20 +177,42 @@ function calculateScores(data) {
   if (meta.lang) entityScore += 5;
   scores.entity = Math.min(100, entityScore);
 
-  // 6. E-E-A-T Signals (0-100) — NEW
+  // 6. E-E-A-T Signals (0-100) — Page-type adaptive
   const eeat = page.eeat;
+  const pageType = (page.pageType && page.pageType.type) || 'general';
+  const isYMYL = page.pageType && page.pageType.isYMYL;
+
+  // Weight profiles per page type (total ~100 base points available)
+  const eeatWeights = {
+    blog:     { authorByline: 18, authorBio: 12, date: 14, credentials: 10, citations3: 15, citations1: 8, privacy: 4, terms: 2, editorial: 8, review: 10, trust: 7 },
+    product:  { authorByline: 5,  authorBio: 3,  date: 8,  credentials: 5,  citations3: 10, citations1: 5, privacy: 12, terms: 10, editorial: 5, review: 18, trust: 19 },
+    homepage: { authorByline: 3,  authorBio: 3,  date: 5,  credentials: 8,  citations3: 8,  citations1: 4, privacy: 15, terms: 12, editorial: 10, review: 8,  trust: 18 },
+    service:  { authorByline: 8,  authorBio: 8,  date: 5,  credentials: 15, citations3: 10, citations1: 5, privacy: 10, terms: 8,  editorial: 8, review: 12, trust: 16 },
+    general:  { authorByline: 15, authorBio: 10, date: 12, credentials: 10, citations3: 15, citations1: 8, privacy: 8,  terms: 5,  editorial: 8, review: 10, trust: 7 }
+  };
+  const w = eeatWeights[pageType] || eeatWeights.general;
+
   let eeatScore = 0;
-  if (eeat.hasAuthorByline) eeatScore += 15;
-  if (eeat.hasAuthorBio) eeatScore += 10;
-  if (eeat.hasVisibleDate) eeatScore += 12;
-  if (eeat.hasCredentials) eeatScore += 10;
-  if (eeat.citedSources >= 3) eeatScore += 15;
-  else if (eeat.citedSources >= 1) eeatScore += 8;
-  if (entity.hasPrivacyLink) eeatScore += 8;
-  if (entity.hasTermsLink) eeatScore += 5;
-  if (eeat.hasEditorialPolicy) eeatScore += 8;
-  if (eeat.hasFactCheckClaim || eeat.hasReviewedBy) eeatScore += 10;
-  if (eeat.hasTrustBadges) eeatScore += 7;
+  if (eeat.hasAuthorByline) eeatScore += w.authorByline;
+  if (eeat.hasAuthorBio) eeatScore += w.authorBio;
+  if (eeat.hasVisibleDate) eeatScore += w.date;
+  if (eeat.hasCredentials) eeatScore += w.credentials;
+  if (eeat.citedSources >= 3) eeatScore += w.citations3;
+  else if (eeat.citedSources >= 1) eeatScore += w.citations1;
+  if (entity.hasPrivacyLink) eeatScore += w.privacy;
+  if (entity.hasTermsLink) eeatScore += w.terms;
+  if (eeat.hasEditorialPolicy) eeatScore += w.editorial;
+  if (eeat.hasFactCheckClaim || eeat.hasReviewedBy) eeatScore += w.review;
+  if (eeat.hasTrustBadges) eeatScore += w.trust;
+
+  // YMYL penalty: missing critical signals lose extra points
+  if (isYMYL) {
+    if (!eeat.hasAuthorByline) eeatScore = Math.max(0, eeatScore - 5);
+    if (!eeat.hasCredentials) eeatScore = Math.max(0, eeatScore - 5);
+    if (eeat.citedSources < 3) eeatScore = Math.max(0, eeatScore - 5);
+    if (!eeat.hasEditorialPolicy && !(eeat.hasFactCheckClaim || eeat.hasReviewedBy)) eeatScore = Math.max(0, eeatScore - 5);
+  }
+
   scores.eeat = Math.min(100, eeatScore);
 
   // 7. Content Citeability (0-100) — NEW
@@ -416,32 +438,54 @@ function generateRecommendations(data, scores) {
     });
   }
 
-  // E-E-A-T
-  if (!page.eeat.hasAuthorByline) {
+  // E-E-A-T (page-type adaptive recommendations)
+  const recPageType = (page.pageType && page.pageType.type) || 'general';
+  const recIsYMYL = page.pageType && page.pageType.isYMYL;
+  const authorCritical = recPageType === 'blog' || recPageType === 'general';
+
+  if (!page.eeat.hasAuthorByline && authorCritical) {
     fixes.push({
       title: 'Add author byline with name and credentials',
-      impact: '+5',
+      impact: recIsYMYL ? '+7' : '+5',
       effort: 'Quick',
       category: 'E-E-A-T',
-      priority: 'high'
+      priority: recIsYMYL ? 'critical' : 'high'
     });
   }
-  if (!page.eeat.hasVisibleDate) {
+  if (!page.eeat.hasVisibleDate && recPageType !== 'homepage') {
     fixes.push({
       title: 'Add visible publication and last-updated dates',
       impact: '+4',
       effort: 'Quick',
       category: 'E-E-A-T',
-      priority: 'medium'
+      priority: recPageType === 'blog' ? 'high' : 'medium'
     });
   }
   if (page.eeat.citedSources < 3) {
     fixes.push({
       title: 'Add external citations to authoritative sources (currently: ' + page.eeat.citedSources + ')',
+      impact: recIsYMYL ? '+6' : '+4',
+      effort: 'Medium',
+      category: 'E-E-A-T',
+      priority: recIsYMYL ? 'high' : 'medium'
+    });
+  }
+  if (recIsYMYL && !page.eeat.hasCredentials) {
+    fixes.push({
+      title: 'YMYL page: Add author credentials (certifications, qualifications)',
+      impact: '+6',
+      effort: 'Medium',
+      category: 'E-E-A-T',
+      priority: 'critical'
+    });
+  }
+  if ((recPageType === 'product' || recPageType === 'service') && !page.eeat.hasTrustBadges) {
+    fixes.push({
+      title: 'Add trust signals (reviews, certifications, security badges)',
       impact: '+4',
       effort: 'Medium',
       category: 'E-E-A-T',
-      priority: 'medium'
+      priority: 'high'
     });
   }
 
@@ -620,7 +664,7 @@ function renderResults(data, scores, recommendations, url) {
   renderContentBody(data.page.headings, data.page.meta);
   renderReadabilityBody(data.page.readability);
   renderEntityBody(data.page.meta, data.page.entity);
-  renderEEATBody(data.page.eeat, data.page.entity);
+  renderEEATBody(data.page.eeat, data.page.entity, data.page.pageType);
   renderCiteabilityBody(data.page.citeability);
   renderPromotionalBody(data.page.promotional);
   renderTechnicalBody(data.page.technical, data.page.content);
@@ -1222,26 +1266,46 @@ function renderEntityBody(meta, entity) {
   ]);
 }
 
-function renderEEATBody(eeat, entity) {
+function renderEEATBody(eeat, entity, pageType) {
   const body = document.getElementById('body-eeat');
+  const pt = (pageType && pageType.type) || 'general';
+  const isYMYL = pageType && pageType.isYMYL;
+
+  // Page-type context banner
+  const ptLabels = {
+    blog: 'Blog — author, date, and citations weighted heavily',
+    product: 'Product — reviews, trust badges, and policies weighted heavily',
+    homepage: 'Homepage — trust pages, policies, and org trust weighted heavily',
+    service: 'Service — credentials, trust badges, and policies weighted heavily',
+    general: 'General — balanced E-E-A-T weighting'
+  };
+  let banner = '<div class="eeat-context" style="padding:6px 10px;margin-bottom:8px;border-radius:6px;background:var(--card-bg);border-left:3px solid var(--accent);font-size:12px;opacity:0.85;">';
+  banner += '<strong>' + esc(ptLabels[pt] || ptLabels.general) + '</strong>';
+  if (isYMYL) banner += ' &middot; <span style="color:#f59e0b;">YMYL extra scrutiny applied</span>';
+  banner += '</div>';
 
   // Sub-tab: Author
   let authorTab = '';
-  authorTab += checkItem(eeat.hasAuthorByline ? 'pass' : 'fail', eeat.hasAuthorByline ? 'Author byline detected' : 'No author byline');
+  const authorLevel = pt === 'blog' || pt === 'general' ? 'fail' : 'warn';
+  authorTab += checkItem(eeat.hasAuthorByline ? 'pass' : authorLevel, eeat.hasAuthorByline ? 'Author byline detected' : 'No author byline');
   authorTab += checkItem(eeat.hasAuthorBio ? 'pass' : 'warn', eeat.hasAuthorBio ? 'Author bio found' : 'No author bio section');
-  authorTab += checkItem(eeat.hasCredentials ? 'pass' : 'info', eeat.hasCredentials ? 'Credentials mentioned' : 'No credentials detected');
-  authorTab += checkItem(eeat.hasVisibleDate ? 'pass' : 'warn', eeat.hasVisibleDate ? 'Publication date visible' : 'No visible date');
+  const credLevel = isYMYL ? 'fail' : (pt === 'service' ? 'warn' : 'info');
+  authorTab += checkItem(eeat.hasCredentials ? 'pass' : credLevel, eeat.hasCredentials ? 'Credentials mentioned' : 'No credentials detected');
+  const dateLevel = pt === 'homepage' ? 'info' : 'warn';
+  authorTab += checkItem(eeat.hasVisibleDate ? 'pass' : dateLevel, eeat.hasVisibleDate ? 'Publication date visible' : 'No visible date');
 
   // Sub-tab: Trust Signals
   let trustTab = '';
   trustTab += checkItem(eeat.citedSources >= 3 ? 'pass' : eeat.citedSources >= 1 ? 'warn' : 'fail', `<strong>${eeat.citedSources}</strong> external citations`);
   trustTab += checkItem(eeat.hasEditorialPolicy ? 'pass' : 'info', eeat.hasEditorialPolicy ? 'Editorial policy found' : 'No editorial policy');
   trustTab += checkItem(eeat.hasReviewedBy || eeat.hasFactCheckClaim ? 'pass' : 'info', eeat.hasReviewedBy || eeat.hasFactCheckClaim ? 'Review/fact-check signals' : 'No review signals');
-  trustTab += checkItem(eeat.hasTrustBadges ? 'pass' : 'info', eeat.hasTrustBadges ? 'Trust badges detected' : 'No trust badges');
-  trustTab += checkItem(entity.hasPrivacyLink ? 'pass' : 'warn', entity.hasPrivacyLink ? 'Privacy policy' : 'No privacy policy');
+  const trustLevel = pt === 'product' || pt === 'service' ? 'warn' : 'info';
+  trustTab += checkItem(eeat.hasTrustBadges ? 'pass' : trustLevel, eeat.hasTrustBadges ? 'Trust badges detected' : 'No trust badges');
+  const privacyLevel = pt === 'homepage' || pt === 'product' ? 'fail' : 'warn';
+  trustTab += checkItem(entity.hasPrivacyLink ? 'pass' : privacyLevel, entity.hasPrivacyLink ? 'Privacy policy' : 'No privacy policy');
   trustTab += checkItem(entity.hasTermsLink ? 'pass' : 'info', entity.hasTermsLink ? 'Terms of service' : 'No terms link');
 
-  body.innerHTML = subTabs([
+  body.innerHTML = banner + subTabs([
     { id: 'eeat-author', label: 'Author', content: authorTab },
     { id: 'eeat-trust', label: 'Trust Signals', content: trustTab }
   ]);
