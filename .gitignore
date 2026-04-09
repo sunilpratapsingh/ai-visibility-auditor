@@ -32,3 +32,8 @@ coverage/
 # Temp
 *.tmp
 *.log
+
+# Sensitive / internal docs
+CLAUDE.md
+*.pdf
+research/
