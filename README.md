@@ -137,8 +137,8 @@ This extension processes everything locally in your browser. It makes **zero ext
 
 **Sunil Pratap Singh**
 - SEO & AI Visibility Consultant | 15+ years in search
-- Creator of the [Search Signal Framework](https://sunilpratapsingh.com)
-- [sunilpratapsingh.com](https://sunilpratapsingh.com)
+- Creator of the [Search Signal Framework](https://sunilpratapsingh.com?utm_source=github&utm_medium=readme&utm_campaign=ai-visibility-auditor)
+- [sunilpratapsingh.com](https://sunilpratapsingh.com?utm_source=github&utm_medium=readme&utm_campaign=ai-visibility-auditor)
 
 ---
 
